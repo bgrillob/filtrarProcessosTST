@@ -1,0 +1,61 @@
+library(magrittr)
+library(tidyverse)
+library(rvest)
+rm(list = ls())
+setwd("C:\\Users\\bruno.bermudez\\Desktop\\Bruno Grillo\\Web Scrapping TST")
+# DADOS PREENCHIMENTO FORMULÁRIO ----
+processosJulgar <- read.table("baseProcessos.csv", sep = ";", header = TRUE, stringsAsFactors = FALSE)
+  # FUNÇÃO GERAR CAMPOS FORMULÁRIO
+separarItens <- function(x) {
+  resultado <- x %>%
+    strsplit(., split = "-") %>%
+    unlist %>%
+    strsplit(., split = "\\.") %>%
+    unlist %>%
+    matrix(., nrow = 1) %>%
+    as.data.frame(., stringsAsFactors = FALSE) %>%
+    set_colnames(c("Número",	"Dígito",	"Ano",	"Ór.",	"Tribunal",	"Vara"))
+  resultado$Número <- sprintf("%07d", as.numeric(resultado$Número))
+return(resultado)
+}
+
+processosJulgar <- data.frame(
+  processosJulgar, 
+  processosJulgar$Processo %>%
+    map(separarItens) %>%
+    do.call(rbind, .), 
+  stringsAsFactors = FALSE)
+
+# SITE ----
+url <- "http://www.tst.jus.br/processos-do-tst"
+processos <- html_session(url)
+
+
+
+
+# EXEMPLO ----
+# Load Packages
+library(rvest)
+
+# Specify URL
+url <- "http://www.cocorahs.org/ViewData/ListDailyPrecipReports.aspx"
+cocorahs <- html_session(url)
+
+# Grab Initial Form
+#  Form is filled in stages. Here, only do country and date
+form.unfilled <- cocorahs %>% html_node("form") %>% html_form()
+form.filled <- form.unfilled %>%
+  set_values(
+    "frmPrecipReportSearch:ucStationTextFieldsFilter:tbTextFieldValue" = "840",
+    "frmPrecipReportSearch_ucDateRangeFilter_dcStartDate" = "6/15/2016",
+    "frmPrecipReportSearch_ucDateRangeFilter_dcEndDate" = "6/15/2016"
+  )
+
+# submit the form and save as a new session
+session <- submit_form(cocorahs, form.filled) 
+
+# look for a table in the nodes
+table <- session %>% html_nodes("table")
+
+# The table you want
+table[[7]] %>% html_table()
