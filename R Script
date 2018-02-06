@@ -1,11 +1,25 @@
+# https://stackoverflow.com/questions/46224378/how-to-submit-a-form-that-seems-to-be-handled-by-javascript-using-httr-or-rvest
+# https://stackoverflow.com/questions/39516673/rvest-could-not-find-possible-submission-target-when-submitting-form
+# https://www.datacamp.com/community/tutorials/scraping-javascript-generated-data-with-r
+library(httr)
 library(magrittr)
 library(tidyverse)
 library(rvest)
+require(xml2)
 rm(list = ls())
-setwd("C:\\Users\\bruno.bermudez\\Desktop\\Bruno Grillo\\Web Scrapping TST")
+setwd("/home/bgrillob/processosTST")
+# FORMATAR DADOS ----
+processosJulgar <- read.table("T2.csv", sep = ",", stringsAsFactors = FALSE)
+processosJulgar <- strsplit(processosJulgar$V1, split = " - ") %>%
+  do.call(rbind, .) %>%
+  set_colnames(c("tipoProcesso", "Processo")) %>%
+  data.frame(
+    Turma = "T2", ., stringsAsFactors = FALSE
+  )
+
 # DADOS PREENCHIMENTO FORMULÁRIO ----
-processosJulgar <- read.table("baseProcessos.csv", sep = ";", header = TRUE, stringsAsFactors = FALSE)
-  # FUNÇÃO GERAR CAMPOS FORMULÁRIO
+#processosJulgar <- read.table("baseProcessos.csv", sep = ";", header = TRUE, stringsAsFactors = FALSE)
+# FUNÇÃO GERAR CAMPOS FORMULÁRIO
 separarItens <- function(x) {
   resultado <- x %>%
     strsplit(., split = "-") %>%
@@ -14,9 +28,9 @@ separarItens <- function(x) {
     unlist %>%
     matrix(., nrow = 1) %>%
     as.data.frame(., stringsAsFactors = FALSE) %>%
-    set_colnames(c("Número",	"Dígito",	"Ano",	"Ór.",	"Tribunal",	"Vara"))
+    set_colnames(c("Número",	"Dígito",	"Ano",	"Órgao",	"Tribunal",	"Vara"))
   resultado$Número <- sprintf("%07d", as.numeric(resultado$Número))
-return(resultado)
+  return(resultado)
 }
 
 processosJulgar <- data.frame(
@@ -28,12 +42,103 @@ processosJulgar <- data.frame(
 
 # SITE ----
 url <- "http://www.tst.jus.br/processos-do-tst"
-processos <- html_session(url)
+siteProcessos <- html_session(url)
+formularioInc <- siteProcessos %>%
+  html_node("form") %>%
+  html_form() 
+
+
+valoresRef <- processosJulgar[1,]
+caminho <- formularioInc
+
+formularioParaTabela <- function(valoresRef, caminho = formularioInc) {
+  formularioComp <- caminho %>%
+    set_values(
+      'p_p_id' = "3",
+      'p_p_lifecycle' = "0",           
+      'p_p_state' = "maximized", 
+      'p_p_mode' = "view",
+      '_3_struts_action' = "/search/search",
+      '_3_redirect' = "/processos-do-tst",
+      "consultaTstNumUnica:numeroTst" = valoresRef$Número,
+      "consultaTstNumUnica:digitoTst" = valoresRef$Dígito,
+      "consultaTstNumUnica:anoTst" = valoresRef$Ano,
+      "consultaTstNumUnica:orgaoTst" = valoresRef$Órgao,
+      "consultaTstNumUnica:tribunalTst" = valoresRef$Tribunal,
+      "consultaTstNumUnica:varaTst" = valoresRef$Vara
+    )
+  
+  sessao <- submit_form(siteProcessos, formularioComp)
+}
 
 
 
 
-# EXEMPLO ----
+# TESTE ----
+hidden <- setNames(
+  html_nodes(siteProcessos, "input[type='hidden']") %>% html_attr("value"),
+  html_nodes(siteProcessos, "input[type='hidden']") %>% html_attr("name")
+) 
+str(hidden)
+
+formularioCompleto <- POST(
+  url = "http://www.tst.jus.br/processos-do-tst", 
+  body = list(
+    'p_p_id' = "3",
+    'p_p_lifecycle' = "0",           
+    'p_p_state' = "maximized", 
+    'p_p_mode' = "view",
+    '_3_struts_action' = "/search/search",
+    '_3_redirect' = "/processos-do-tst",
+    "numeroTst" = valoresRef$Número,
+    "digitoTst" = valoresRef$Dígito,
+    "anoTst" = valoresRef$Ano,
+    "orgaoTst" = valoresRef$Órgao,
+    "tribunalTst" = valoresRef$Tribunal,
+    "varaTst" = valoresRef$Vara,
+    "btnConsulta" = "Consultar"
+  ), 
+  encode = "form"
+)
+conteudoPaginaResposta <- content(formularioCompleto, as = "parsed") 
+
+tabela <- conteudoPaginaResposta %>%
+  html_node("table") %>%
+  html_table()
+
+  
+
+# EXEMPLO HTTR ----
+library(httr)
+library(rvest)
+library(purrr)
+library(dplyr)
+res <- POST("http://www.blm.mx/es/tiendas.php",
+  body = list(
+    txt_5 = "11850"#, 
+    #drp_1 = "-1"
+  ), 
+  encode = "form"
+)
+
+pg <- read_html(content(res, as = "text", encoding = "UTF-8"))
+
+map(html_nodes(pg, xpath=".//div[@class='tiendas_resultado_right']"), ~html_nodes(., xpath=".//text()")) %>% 
+  map_df(function(x) {
+    map(seq(1, length(x), 2), ~paste0(x[.:(.+1)], collapse="")) %>% 
+      trimws() %>% 
+      as.list() %>% 
+      setNames(sprintf("x%d", 1:length(.)))
+  }) -> right
+
+left <- html_nodes(pg, "div.tiendas_resultado_left") %>%  html_text()
+
+df <- bind_cols(data_frame(x0=left), right)
+
+glimpse(df)
+
+
+# EXEMPLO RVEST ----
 # Load Packages
 library(rvest)
 
