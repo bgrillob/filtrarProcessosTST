@@ -1,6 +1,7 @@
 # https://stackoverflow.com/questions/46224378/how-to-submit-a-form-that-seems-to-be-handled-by-javascript-using-httr-or-rvest
 # https://stackoverflow.com/questions/39516673/rvest-could-not-find-possible-submission-target-when-submitting-form
 # https://www.datacamp.com/community/tutorials/scraping-javascript-generated-data-with-r
+# https://htmledit.squarefree.com/
 library(httr)
 library(magrittr)
 library(tidyverse)
