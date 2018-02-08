@@ -42,126 +42,39 @@ processosJulgar <- data.frame(
   stringsAsFactors = FALSE)
 
 # SITE ----
-url <- "http://www.tst.jus.br/processos-do-tst"
+  # A URL ONDE HÁ FORMULÁRIOS É UMA CONTENT INNER QUE CHAMA A APLICAÇÃO NO PRÓXIMO SITE
+url <- "http://www.tst.jus.br/processos-do-tst" 
+  # URL DA APLICAÇÃO
+url <- "http://aplicacao4.tst.jus.br/consultaProcessual/"
 siteProcessos <- html_session(url)
 formularioInc <- siteProcessos %>%
-  html_node("form") %>%
+  html_nodes("form") %>%
   html_form() 
-
+formularioInc <- formularioInc[[1]]
 
 valoresRef <- processosJulgar[1,]
 caminho <- formularioInc
 
 formularioParaTabela <- function(valoresRef, caminho = formularioInc) {
+      # CAMPOS PREENCHER NO FORMULÁRIO
   formularioComp <- caminho %>%
     set_values(
-      'p_p_id' = "3",
-      'p_p_lifecycle' = "0",           
-      'p_p_state' = "maximized", 
-      'p_p_mode' = "view",
-      '_3_struts_action' = "/search/search",
-      '_3_redirect' = "/processos-do-tst",
-      "consultaTstNumUnica:numeroTst" = valoresRef$Número,
-      "consultaTstNumUnica:digitoTst" = valoresRef$Dígito,
-      "consultaTstNumUnica:anoTst" = valoresRef$Ano,
-      "consultaTstNumUnica:orgaoTst" = valoresRef$Órgao,
-      "consultaTstNumUnica:tribunalTst" = valoresRef$Tribunal,
-      "consultaTstNumUnica:varaTst" = valoresRef$Vara
+      numeroTst = as.numeric(valoresRef$Número),
+      digitoTst = as.numeric(valoresRef$Dígito),
+      anoTst = as.numeric(valoresRef$Ano),
+      orgaoTst = as.numeric(valoresRef$Órgao),
+      tribunalTst = as.numeric(valoresRef$Tribunal),
+      varaTst = as.numeric(valoresRef$Vara)
     )
-  
+      # ENVIAR FORMULÁRIO
   sessao <- submit_form(siteProcessos, formularioComp)
+      # PEGAR NÓS QUE SÃO TABELA E TRANSFORMAR EM DATA FRAME
+  tabelas <- sessao %>%
+    html_nodes("table") 
+  tabela <- tabelas[[11]] %>%
+    html_table(fill = TRUE, header = FALSE) 
+  resultado <- tabela %>%
+    unlist() %>% 
+    as.character()  %>%
+    
 }
-
-
-
-
-# TESTE ----
-hidden <- setNames(
-  html_nodes(siteProcessos, "input[type='hidden']") %>% html_attr("value"),
-  html_nodes(siteProcessos, "input[type='hidden']") %>% html_attr("name")
-) 
-str(hidden)
-
-formularioCompleto <- POST(
-  url = "http://www.tst.jus.br/processos-do-tst", 
-  body = list(
-    'p_p_id' = "3",
-    'p_p_lifecycle' = "0",           
-    'p_p_state' = "maximized", 
-    'p_p_mode' = "view",
-    '_3_struts_action' = "/search/search",
-    '_3_redirect' = "/processos-do-tst",
-    "numeroTst" = valoresRef$Número,
-    "digitoTst" = valoresRef$Dígito,
-    "anoTst" = valoresRef$Ano,
-    "orgaoTst" = valoresRef$Órgao,
-    "tribunalTst" = valoresRef$Tribunal,
-    "varaTst" = valoresRef$Vara,
-    "btnConsulta" = "Consultar"
-  ), 
-  encode = "form"
-)
-conteudoPaginaResposta <- content(formularioCompleto, as = "parsed") 
-
-tabela <- conteudoPaginaResposta %>%
-  html_node("table") %>%
-  html_table()
-
-  
-
-# EXEMPLO HTTR ----
-library(httr)
-library(rvest)
-library(purrr)
-library(dplyr)
-res <- POST("http://www.blm.mx/es/tiendas.php",
-  body = list(
-    txt_5 = "11850"#, 
-    #drp_1 = "-1"
-  ), 
-  encode = "form"
-)
-
-pg <- read_html(content(res, as = "text", encoding = "UTF-8"))
-
-map(html_nodes(pg, xpath=".//div[@class='tiendas_resultado_right']"), ~html_nodes(., xpath=".//text()")) %>% 
-  map_df(function(x) {
-    map(seq(1, length(x), 2), ~paste0(x[.:(.+1)], collapse="")) %>% 
-      trimws() %>% 
-      as.list() %>% 
-      setNames(sprintf("x%d", 1:length(.)))
-  }) -> right
-
-left <- html_nodes(pg, "div.tiendas_resultado_left") %>%  html_text()
-
-df <- bind_cols(data_frame(x0=left), right)
-
-glimpse(df)
-
-
-# EXEMPLO RVEST ----
-# Load Packages
-library(rvest)
-
-# Specify URL
-url <- "http://www.cocorahs.org/ViewData/ListDailyPrecipReports.aspx"
-cocorahs <- html_session(url)
-
-# Grab Initial Form
-#  Form is filled in stages. Here, only do country and date
-form.unfilled <- cocorahs %>% html_node("form") %>% html_form()
-form.filled <- form.unfilled %>%
-  set_values(
-    "frmPrecipReportSearch:ucStationTextFieldsFilter:tbTextFieldValue" = "840",
-    "frmPrecipReportSearch_ucDateRangeFilter_dcStartDate" = "6/15/2016",
-    "frmPrecipReportSearch_ucDateRangeFilter_dcEndDate" = "6/15/2016"
-  )
-
-# submit the form and save as a new session
-session <- submit_form(cocorahs, form.filled) 
-
-# look for a table in the nodes
-table <- session %>% html_nodes("table")
-
-# The table you want
-table[[7]] %>% html_table()
