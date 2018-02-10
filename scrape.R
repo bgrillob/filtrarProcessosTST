@@ -2,6 +2,7 @@
 # https://stackoverflow.com/questions/39516673/rvest-could-not-find-possible-submission-target-when-submitting-form
 # https://www.datacamp.com/community/tutorials/scraping-javascript-generated-data-with-r
 # https://htmledit.squarefree.com/
+# https://stackoverflow.com/questions/46304664/how-to-deal-with-captcha-when-web-scraping-using-r
 library(httr)
 library(magrittr)
 library(tidyverse)
@@ -46,12 +47,16 @@ processosJulgar <- data.frame(
 url <- "http://www.tst.jus.br/processos-do-tst" 
   # URL DA APLICAÇÃO
 url <- "http://aplicacao4.tst.jus.br/consultaProcessual/"
+
+# EXTRAIR DADOS ----
+  # ESTABELECEU SESSAO COM SITE ----
 siteProcessos <- html_session(url)
 formularioInc <- siteProcessos %>%
   html_nodes("form") %>%
   html_form() 
 formularioInc <- formularioInc[[1]]
 
+  # FUNÇÃO EXTRAIR TABELA EVOLUÇÃO PROCESSO ----
 valoresRef <- processosJulgar[1,]
 caminho <- formularioInc
 
@@ -69,12 +74,33 @@ formularioParaTabela <- function(valoresRef, caminho = formularioInc) {
       # ENVIAR FORMULÁRIO
   sessao <- submit_form(siteProcessos, formularioComp)
       # PEGAR NÓS QUE SÃO TABELA E TRANSFORMAR EM DATA FRAME
-  tabelas <- sessao %>%
-    html_nodes("table") 
-  tabela <- tabelas[[11]] %>%
-    html_table(fill = TRUE, header = FALSE) 
-  resultado <- tabela %>%
-    unlist() %>% 
-    as.character()  %>%
-    
+  tabelas <- sessao %>% 
+    html_nodes("text") 
+  textoParaTabela <- tabelas[[11]] %>%
+    html_text() %>%
+    gsub(pattern = "(\r|<br />)", replacement = "") %>%
+    gsub(pattern = "(\n|<br />)", replacement = "") %>%
+    gsub(pattern = "(\t|<br />)", replacement = ";") %>%
+    strsplit(split = ";") %>%
+    unlist() %>%
+    {.[!(. %in% c("", "Histórico do processo"))]}
+  nTxt <- length(textoParaTabela)
+  tabelaRes <- data.frame(
+    Data = textoParaTabela[seq(1, nTxt, 2)],
+    Evolucao = textoParaTabela[seq(0, nTxt, 2)],
+    stringsAsFactors = FALSE
+  )
+return(tabelaRes)
 }
+
+
+# ESTRUTURAR TABELA PARA COLETA ----
+processosJulgar <- split(processosJulgar, seq(nrow(processosJulgar)))
+tabelasProcessos <- vector("list", length(processosJulgar))
+for (w in seq_along(processosJulgar)) {
+  tabelasProcessos[[w]] <- formularioParaTabela(valoresRef = processosJulgar[[w]])
+  tempoEsperar <- runif(1, min = 10, max = 30)
+  print(tempoEsperar)
+  Sys.sleep(tempoEsperar) # INSERIR TEMPO DE ESPERA PRA EVITAR CAPTCHA
+}
+
