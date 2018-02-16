@@ -3,6 +3,7 @@
 # https://www.datacamp.com/community/tutorials/scraping-javascript-generated-data-with-r
 # https://htmledit.squarefree.com/
 # https://stackoverflow.com/questions/46304664/how-to-deal-with-captcha-when-web-scraping-using-r
+# https://stackoverflow.com/questions/41466263/r-change-ip-address-programatically
 library(httr)
 library(magrittr)
 library(tidyverse)
@@ -49,18 +50,17 @@ url <- "http://www.tst.jus.br/processos-do-tst"
 url <- "http://aplicacao4.tst.jus.br/consultaProcessual/"
 
 # EXTRAIR DADOS ----
-  # ESTABELECEU SESSAO COM SITE ----
-siteProcessos <- html_session(url)
-formularioInc <- siteProcessos %>%
-  html_nodes("form") %>%
-  html_form() 
-formularioInc <- formularioInc[[1]]
-
   # FUNÇÃO EXTRAIR TABELA EVOLUÇÃO PROCESSO ----
-valoresRef <- processosJulgar[1,]
-caminho <- formularioInc
+w <- 1
+valoresRef <- processosJulgar[w,]
 
-formularioParaTabela <- function(valoresRef, caminho = formularioInc) {
+formularioParaTabela <- function(valoresRef) {
+      # ESTABELECER CONEXAO COM O SITE
+  siteProcessos <- html_session(url) #, use_proxy(url = "143.0.188.8", port = 80) )
+  formularioInc <- siteProcessos %>%
+    html_nodes("form") %>%
+    html_form() 
+  caminho <- formularioInc[[1]]
       # CAMPOS PREENCHER NO FORMULÁRIO
   formularioComp <- caminho %>%
     set_values(
@@ -75,7 +75,7 @@ formularioParaTabela <- function(valoresRef, caminho = formularioInc) {
   sessao <- submit_form(siteProcessos, formularioComp)
       # PEGAR NÓS QUE SÃO TABELA E TRANSFORMAR EM DATA FRAME
   tabelas <- sessao %>% 
-    html_nodes("text") 
+    html_nodes("table") 
   textoParaTabela <- tabelas[[11]] %>%
     html_text() %>%
     gsub(pattern = "(\r|<br />)", replacement = "") %>%
@@ -99,7 +99,7 @@ processosJulgar <- split(processosJulgar, seq(nrow(processosJulgar)))
 tabelasProcessos <- vector("list", length(processosJulgar))
 for (w in seq_along(processosJulgar)) {
   tabelasProcessos[[w]] <- formularioParaTabela(valoresRef = processosJulgar[[w]])
-  tempoEsperar <- runif(1, min = 10, max = 30)
+  tempoEsperar <- runif(1, min = 1, max = 5)
   print(tempoEsperar)
   Sys.sleep(tempoEsperar) # INSERIR TEMPO DE ESPERA PRA EVITAR CAPTCHA
 }
