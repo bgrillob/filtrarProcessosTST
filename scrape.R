@@ -11,9 +11,15 @@ library(rvest)
 require(xml2)
 rm(list = ls())
 setwd("/home/bgrillob/processosTST")
+# COLETAR PROCESSOS EM PREVISÃO DE PAUTA ----
+processosJulgar <- html_session(
+  "http://aplicacao5.tst.jus.br/consultapauta/pautaForm.do?relatorProcesso=GMMHM&codOrgaoJudic=74"
+  ) %>%
+  html_nodes("table") %>%
+  .[[3]] %>%
+  html_table()
 # FORMATAR DADOS ----
-processosJulgar <- read.table("T2.csv", sep = ",", stringsAsFactors = FALSE)
-processosJulgar <- strsplit(processosJulgar$V1, split = " - ") %>%
+processosJulgar <- strsplit(processosJulgar$X1, split = " - ") %>%
   do.call(rbind, .) %>%
   set_colnames(c("tipoProcesso", "Processo")) %>%
   data.frame(
@@ -91,6 +97,7 @@ formularioParaTabela <- function(valoresRef) {
     stringsAsFactors = FALSE
   )
 return(tabelaRes)
+#return(headers(siteProcessos))
 }
 
 
@@ -103,4 +110,3 @@ for (w in seq_along(processosJulgar)) {
   print(tempoEsperar)
   Sys.sleep(tempoEsperar) # INSERIR TEMPO DE ESPERA PRA EVITAR CAPTCHA
 }
-
