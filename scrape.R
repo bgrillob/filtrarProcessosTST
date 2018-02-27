@@ -10,7 +10,7 @@ library(tidyverse)
 library(rvest)
 require(xml2)
 rm(list = ls())
-
+setwd("/home/bgrillob/processosTST")
 # COLETAR PROCESSOS EM PREVISÃO DE PAUTA ----
 processosJulgar <- html_session(
   "http://aplicacao5.tst.jus.br/consultapauta/pautaForm.do?relatorProcesso=GMMHM&codOrgaoJudic=74"
@@ -60,9 +60,15 @@ url <- "http://aplicacao4.tst.jus.br/consultaProcessual/"
 w <- 1
 valoresRef <- processosJulgar[w,]
 
-formularioParaTabela <- function(valoresRef) {
+formularioParaTabela <- function(valoresRef, site, 
+                                 IP = NULL, PORT = NULL) {
       # ESTABELECER CONEXAO COM O SITE
-  siteProcessos <- html_session(url) #, use_proxy(url = "143.0.188.8", port = 80) )
+  if (!(is.null(IP) && is.null(PORT))) {
+    siteProcessos <- html_session(site, use_proxy(url = IP, port = PORT))
+  } else {
+    siteProcessos <- html_session(site) 
+  }
+
   formularioInc <- siteProcessos %>%
     html_nodes("form") %>%
     html_form() 
@@ -105,8 +111,9 @@ return(tabelaRes)
 processosJulgar <- split(processosJulgar, seq(nrow(processosJulgar)))
 tabelasProcessos <- vector("list", length(processosJulgar))
 for (w in seq_along(processosJulgar)) {
-  tabelasProcessos[[w]] <- formularioParaTabela(valoresRef = processosJulgar[[w]])
+  tabelasProcessos[[w]] <- formularioParaTabela(valoresRef = processosJulgar[[w]], site = url)
   tempoEsperar <- runif(1, min = 1, max = 5)
   print(tempoEsperar)
   Sys.sleep(tempoEsperar) # INSERIR TEMPO DE ESPERA PRA EVITAR CAPTCHA
 }
+
