@@ -10,7 +10,7 @@ library(tidyverse)
 library(rvest)
 require(xml2)
 rm(list = ls())
-setwd("/home/bgrillob/processosTST")
+
 # COLETAR PROCESSOS EM PREVISÃO DE PAUTA ----
 processosJulgar <- html_session(
   "http://aplicacao5.tst.jus.br/consultapauta/pautaForm.do?relatorProcesso=GMMHM&codOrgaoJudic=74"
