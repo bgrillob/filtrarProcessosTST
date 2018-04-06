@@ -10,11 +10,12 @@ library(tidyverse)
 library(rvest)
 require(xml2)
 rm(list = ls())
-setwd("/home/bgrillob/processosTST")
+setwd("/media/crikket/DATA/processosTST/")
 # COLETAR PROCESSOS EM PREVISÃO DE PAUTA ----
 processosJulgar <- html_session(
-  "http://aplicacao5.tst.jus.br/consultapauta/pautaForm.do?relatorProcesso=GMMHM&codOrgaoJudic=74"
-  ) %>%
+  #"http://aplicacao5.tst.jus.br/consultapauta/pautaForm.do?relatorProcesso=GMMHM&codOrgaoJudic=74"
+  "http://aplicacao5.tst.jus.br/consultapauta/pautaForm.do?relatorProcesso=GMWOC&codOrgaoJudic=69"
+) %>%
   html_nodes("table") %>%
   .[[3]] %>%
   html_table()
@@ -50,30 +51,30 @@ processosJulgar <- data.frame(
   stringsAsFactors = FALSE)
 
 # SITE ----
-  # A URL ONDE HÁ FORMULÁRIOS É UMA CONTENT INNER QUE CHAMA A APLICAÇÃO NO PRÓXIMO SITE
+# A URL ONDE HÁ FORMULÁRIOS É UMA CONTENT INNER QUE CHAMA A APLICAÇÃO NO PRÓXIMO SITE
 url <- "http://www.tst.jus.br/processos-do-tst" 
-  # URL DA APLICAÇÃO
+# URL DA APLICAÇÃO
 url <- "http://aplicacao4.tst.jus.br/consultaProcessual/"
 
 # EXTRAIR DADOS ----
-  # FUNÇÃO EXTRAIR TABELA EVOLUÇÃO PROCESSO ----
+# FUNÇÃO EXTRAIR TABELA EVOLUÇÃO PROCESSO ----
 w <- 1
 valoresRef <- processosJulgar[w,]
 
 formularioParaTabela <- function(valoresRef, site, 
                                  IP = NULL, PORT = NULL) {
-      # ESTABELECER CONEXAO COM O SITE
+  # ESTABELECER CONEXAO COM O SITE
   if (!(is.null(IP) && is.null(PORT))) {
     siteProcessos <- html_session(site, use_proxy(url = IP, port = PORT))
   } else {
     siteProcessos <- html_session(site) 
   }
-
+  
   formularioInc <- siteProcessos %>%
     html_nodes("form") %>%
     html_form() 
   caminho <- formularioInc[[1]]
-      # CAMPOS PREENCHER NO FORMULÁRIO
+  # CAMPOS PREENCHER NO FORMULÁRIO
   formularioComp <- caminho %>%
     set_values(
       numeroTst = as.numeric(valoresRef$Número),
@@ -83,9 +84,9 @@ formularioParaTabela <- function(valoresRef, site,
       tribunalTst = as.numeric(valoresRef$Tribunal),
       varaTst = as.numeric(valoresRef$Vara)
     )
-      # ENVIAR FORMULÁRIO
+  # ENVIAR FORMULÁRIO
   sessao <- submit_form(siteProcessos, formularioComp)
-      # PEGAR NÓS QUE SÃO TABELA E TRANSFORMAR EM DATA FRAME
+  # PEGAR NÓS QUE SÃO TABELA E TRANSFORMAR EM DATA FRAME
   tabelas <- sessao %>% 
     html_nodes("table") 
   textoParaTabela <- tabelas[[11]] %>%
@@ -96,24 +97,37 @@ formularioParaTabela <- function(valoresRef, site,
     strsplit(split = ";") %>%
     unlist() %>%
     {.[!(. %in% c("", "Histórico do processo"))]}
+  
+    # REMOVER OBSERVAÇÕES ANTERIORES A 2013
+  refRemov <- min(c(
+    grep(pattern = "2012", textoParaTabela),
+    grep(pattern = "2011", textoParaTabela)
+  ))
+  if (!is.infinite(refRemov)) {
+    textoParaTabela <- textoParaTabela[seq(refRemov - 1)]
+  }
+  
   nTxt <- length(textoParaTabela)
   tabelaRes <- data.frame(
     Data = textoParaTabela[seq(1, nTxt, 2)],
     Evolucao = textoParaTabela[seq(0, nTxt, 2)],
     stringsAsFactors = FALSE
   )
-return(tabelaRes)
-#return(headers(siteProcessos))
+  return(tabelaRes)
+  #return(headers(siteProcessos))
 }
 
 
 # ESTRUTURAR TABELA PARA COLETA ----
+processosJulgar <- processosJulgar %>% filter(tipoProcesso == "RR") # OPCIONAL
 processosJulgar <- split(processosJulgar, seq(nrow(processosJulgar)))
 tabelasProcessos <- vector("list", length(processosJulgar))
+  # VETOR COM TEMPO PARA CANCELAR PROCESSAMENTO
+tempoEsperar <- runif(n = length(processosJulgar), min = 195, max = 200)
+tempoEsperar[seq(1, length(processosJulgar), by = 2)] <- 0.5
+
 for (w in seq_along(processosJulgar)) {
   tabelasProcessos[[w]] <- formularioParaTabela(valoresRef = processosJulgar[[w]], site = url)
-  tempoEsperar <- runif(1, min = 1, max = 5)
-  print(tempoEsperar)
-  Sys.sleep(tempoEsperar) # INSERIR TEMPO DE ESPERA PRA EVITAR CAPTCHA
+  print(tempoEsperar[w])
+  Sys.sleep(tempoEsperar[w]) # INSERIR TEMPO DE ESPERA PRA EVITAR CAPTCHA
 }
-
