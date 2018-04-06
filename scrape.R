@@ -123,9 +123,10 @@ processosJulgar <- processosJulgar %>% filter(tipoProcesso == "RR") # OPCIONAL
 processosJulgar <- split(processosJulgar, seq(nrow(processosJulgar)))
 tabelasProcessos <- vector("list", length(processosJulgar))
   # VETOR COM TEMPO PARA CANCELAR PROCESSAMENTO
-tempoEsperar <- runif(n = length(processosJulgar), min = 195, max = 200)
-tempoEsperar[seq(1, length(processosJulgar), by = 2)] <- 0.5
-
+tempoEsperar <- rep(0, length(processosJulgar))
+refEsperar <- seq(3, length(tempoEsperar), by = 3)
+tempoEsperar[refEsperar] <- runif(n = length(refEsperar), min = 180, max = 200)
+  # LOOP PARA RODAR
 for (w in seq_along(processosJulgar)) {
   tabelasProcessos[[w]] <- formularioParaTabela(valoresRef = processosJulgar[[w]], site = url)
   print(tempoEsperar[w])
