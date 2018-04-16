@@ -4,6 +4,7 @@
 # https://htmledit.squarefree.com/
 # https://stackoverflow.com/questions/46304664/how-to-deal-with-captcha-when-web-scraping-using-r
 # https://stackoverflow.com/questions/41466263/r-change-ip-address-programatically
+options(timeout= 4000000)
 library(httr)
 library(magrittr)
 library(tidyverse)
@@ -100,8 +101,8 @@ formularioParaTabela <- function(valoresRef, site,
   
     # REMOVER OBSERVAÇÕES ANTERIORES A 2013
   refRemov <- min(c(
-    grep(pattern = "2012", textoParaTabela),
-    grep(pattern = "2011", textoParaTabela)
+    grep(pattern = "/2012", textoParaTabela),
+    grep(pattern = "/2011", textoParaTabela)
   ))
   if (!is.infinite(refRemov)) {
     textoParaTabela <- textoParaTabela[seq(refRemov - 1)]
@@ -130,5 +131,23 @@ tempoEsperar[refEsperar] <- runif(n = length(refEsperar), min = 180, max = 200)
 for (w in seq_along(processosJulgar)) {
   tabelasProcessos[[w]] <- formularioParaTabela(valoresRef = processosJulgar[[w]], site = url)
   print(tempoEsperar[w])
+  print(w)
   Sys.sleep(tempoEsperar[w]) # INSERIR TEMPO DE ESPERA PRA EVITAR CAPTCHA
 }
+
+
+coletarData <- lapply(tabelasProcessos, function(x) {
+  x %>%
+    filter(
+      grepl("Conclusos para voto", Evolucao)
+    ) %>%
+    mutate(
+      Data = as.Date(Data, format = "%d/%m/%Y")
+    ) %>%
+    summarise(
+      Resultado = min(Data)
+    ) %>%
+    pull(Resultado)
+}) %>%
+  unlist %>%
+  as.Date(origin = "1970-01-01")
